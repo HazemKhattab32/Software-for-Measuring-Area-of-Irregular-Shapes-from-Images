@@ -1,0 +1,254 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Area Measurement Tool</title>
+  <link rel="stylesheet" href="style.css" />
+  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+</head>
+
+<body>
+
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 14 L6 6 L10 10 L13 7 L16 14 Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"
+          fill="rgba(255,255,255,0.2)"></path>
+        <circle cx="14" cy="4" r="1.5" fill="white"></circle>
+      </svg>
+    </div>
+    <div>
+      <h1>Shape Area Measurement</h1>
+      <p>Image-based irregular shape area calculator</p>
+    </div>
+    <div class="header-right">
+      <span class="badge">
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <circle cx="5" cy="5" r="4" fill="currentColor" opacity="0.3"></circle>
+          <circle cx="5" cy="5" r="2" fill="currentColor"></circle>
+        </svg>
+        Polygon · Magic Wand · Calibration · Color
+      </span>
+      <button class="dark-mode-btn" onclick="toggleDarkMode()" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <!-- Moon icon (shown in light mode) -->
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <!-- Sun icon (shown in dark mode) -->
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- SIDEBAR -->
+    <aside>
+
+      <!-- Step 1: Upload -->
+      <div class="section">
+        <div class="section-title">Step 1 — Image</div>
+        <div class="step-row">
+          <div class="step-num">1</div>
+          <span class="step-label">Upload image</span>
+          <span class="status-tag done" id="img-status">Loaded</span>
+        </div>
+        <button class="btn" onclick="document.getElementById('file-input').click()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"></rect>
+            <circle cx="5" cy="7" r="1.5" stroke="currentColor" stroke-width="1.2"></circle>
+            <path d="M1 10 l4-3 2.5 2 2.5-2.5 3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+            </path>
+            <path d="M7 1 v4 M5.5 2.5 l1.5-1.5 1.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"
+              stroke-linejoin="round"></path>
+          </svg>
+          Choose Image File
+        </button>
+        <input type="file" id="file-input" accept="image/*" style="display:none">
+        <p style="font-size:11px;color:var(--text-hint);margin-top:4px;">Supports JPG, PNG, BMP, TIFF, WebP. Drag &amp;
+          drop onto canvas.</p>
+      </div>
+
+      <div class="divider" style="margin:0 0 16px;"></div>
+
+      <!-- Step 2: Calibrate -->
+      <div class="section">
+        <div class="section-title">Step 2 — Calibration</div>
+        <div class="step-row">
+          <div class="step-num">2</div>
+          <span class="step-label">Set scale</span>
+          <span class="status-tag" id="cal-status">Pending</span>
+        </div>
+        <div class="hint-box" id="cal-hint">
+          Switch to <strong>Calibrate</strong> mode, then click two points on a known-length reference (e.g. a ruler or
+          coin).
+        </div>
+        <div id="cal-info" style="display: none;">
+          <div class="info-row"><span>Line length:</span><span id="cal-px-val">— px</span></div>
+        </div>
+        <label>Known real-world length</label>
+        <input type="number" id="real-length" value="10" min="0.001" step="any" placeholder="e.g. 10">
+        <label>Unit</label>
+        <select id="unit">
+          <option value="cm">Centimeters (cm)</option>
+          <option value="mm">Millimeters (mm)</option>
+          <option value="m">Meters (m)</option>
+          <option value="in">Inches (in)</option>
+          <option value="px" selected="">Pixels only (no scale)</option>
+        </select>
+      </div>
+
+      <div class="divider" style="margin:0 0 16px;"></div>
+
+      <!-- Step 3: Draw -->
+      <div class="section">
+        <div class="section-title">Step 3 — Select shape</div>
+        <div class="step-row">
+          <div class="step-num">3</div>
+          <span class="step-label">Drawing mode</span>
+        </div>
+        <div class="mode-grid">
+          <button class="mode-btn" id="mode-calibrate" onclick="setMode('calibrate')">Calibrate</button>
+          <button class="mode-btn" id="mode-polygon" onclick="setMode('polygon')">Polygon</button>
+          <button class="mode-btn active" id="mode-magic" onclick="setMode('magic')">Magic</button>
+          <button class="mode-btn" id="mode-color" onclick="setMode('color')">🎨 Color</button>
+        </div>
+        <div class="hint-box" id="mode-hint-box">Click anywhere inside the shape. The tool selects connected pixels of
+          similar color. Adjust tolerance to include more or fewer pixels.</div>
+
+        <!-- Magic wand tolerance -->
+        <div id="magic-controls" style="display: block;">
+          <label>Tolerance <span id="tol-val" style="color:var(--text);font-weight:600;">30</span></label>
+          <input type="range" id="tolerance" min="5" max="80" value="30">
+          <div class="info-row" style="margin-top:2px;"><span>Less strict</span><span>More strict →</span></div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <button class="btn danger" onclick="clearSelection()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2 2 l9 9 M11 2 l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+            </svg>
+            Clear Selection
+          </button>
+          <button class="btn" onclick="clearAll()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <rect x="1.5" y="3" width="10" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"></rect>
+              <path d="M4.5 3 V2 a1 1 0 0 1 1-1 h2 a1 1 0 0 1 1 1 v1" stroke="currentColor" stroke-width="1.2"></path>
+              <path d="M5 6 v3 M8 6 v3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+            </svg>
+            Reset All
+          </button>
+        </div>
+        <div style="margin-top:8px; display: flex; gap: 5px;">
+          <button class="btn" onclick="undoLastPoint()" style="flex:1;">
+            <span>↩️ Undo</span>
+          </button>
+          <button class="btn primary" id="canny-btn" onclick="toggleEdges()" style="flex:1;">
+            <span>🔍 Show Edges</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="divider" style="margin:0 0 16px;"></div>
+
+      <!-- COLOR ANALYSIS SECTION (shown only in color mode) -->
+      <div class="section" id="color-section">
+        <div class="section-title">Color Area Analysis</div>
+
+        <label style="margin-bottom:6px;">Preset colors — click to select</label>
+        <div class="palette-swatches" id="palette-swatches"></div>
+
+        <div class="custom-color-row">
+          <input type="color" id="custom-color-picker" value="#ff0000" title="Pick custom color">
+          <button class="btn" onclick="addCustomColor()" style="margin-bottom:0;">+ Add custom color</button>
+        </div>
+
+        <label>Color tolerance <span id="color-tol-val" style="color:var(--text);font-weight:600;">45</span></label>
+        <input type="range" id="color-tolerance" min="1" max="150" value="45">
+        <div class="info-row" style="margin-top:2px;margin-bottom:8px;"><span>Exact match</span><span>Wide range →</span></div>
+
+        <button class="btn" onclick="autoDetectColors()" style="margin-bottom:6px;">
+          🔍 Auto-detect dominant colors
+        </button>
+        <button class="btn primary" onclick="analyzeColors()">
+          ▶ Analyze selected colors
+        </button>
+        <div id="color-progress">Analyzing pixels…</div>
+
+        <div id="color-results-list"></div>
+      </div>
+
+      <!-- Results -->
+      <div class="section" id="results-section" style="display: block;">
+        <div class="section-title">Results</div>
+        <div class="result-grid">
+          <div class="result-card">
+            <div class="rc-label">Area (px²)</div>
+            <div class="rc-value" id="res-px">—</div>
+            <div class="rc-unit">square pixels</div>
+          </div>
+          <div class="result-card highlight" id="real-card" style="display: none;">
+            <div class="rc-label" id="res-unit-label">Real area</div>
+            <div class="rc-value" id="res-real">—</div>
+            <div class="rc-unit" id="res-unit-sub">cm²</div>
+          </div>
+        </div>
+        <div class="info-row" id="perimeter-row" style="display: flex;">
+          <span>Perimeter:</span>
+          <span id="res-perimeter">—</span>
+        </div>
+        <div class="info-row" id="vertices-row" style="display: none;">
+          <span>Vertices:</span>
+          <span id="res-vertices">—</span>
+        </div>
+        <div style="margin-top: 8px; display: none;" id="export-row">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span id="shape-count-badge" style="display:none; align-items:center; gap:4px; padding:3px 8px; border-radius:99px; font-size:10px; font-weight:700; letter-spacing:0.04em; background:var(--info-bg); color:var(--info);">0 shapes recorded</span>
+          </div>
+          <button class="btn primary" onclick="exportCSV()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <rect x="1" y="1" width="11" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2"></rect>
+              <path d="M4 6.5 h5 M6.5 4 v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+            </svg>
+            Export All Shapes as CSV
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- CANVAS -->
+    <div class="canvas-area" id="canvas-area">
+      <div id="upload-zone" style="display: none;">
+        <svg class="uz-icon" width="56" height="56" viewBox="0 0 56 56" fill="none">
+          <rect x="6" y="12" width="44" height="32" rx="4" stroke="currentColor" stroke-width="2"></rect>
+          <circle cx="20" cy="24" r="4" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M6 36 l14-11 8 7 8-8 14 13" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+          <path d="M28 4 v12 M23 9 l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        <p class="uz-text">Drop your image here</p>
+        <p class="uz-sub">or click to browse files · JPG, PNG, BMP, TIFF supported</p>
+        <button class="uz-btn" onclick="document.getElementById('file-input').click()">Browse Files</button>
+      </div>
+      <canvas id="main-canvas" style="display: none;"></canvas>
+
+      <!-- Bottom toolbar overlay -->
+      <div id="toolbar">
+        <span id="tb-mode">Magic wand mode</span>
+        <span class="sep">|</span>
+        <span id="tb-xy">x: — y: —</span>
+        <span class="sep">|</span>
+        <span id="tb-pts">Points: 0</span>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+  <script src="script.js"></script>
+</body>
+
+</html>
